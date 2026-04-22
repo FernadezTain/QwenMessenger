@@ -277,18 +277,13 @@ function renderWelcome() {
         </p>
         <div class="hero-actions">
           <button id="start-btn" class="btn" type="button">Начать</button>
-          <button id="open-admin-btn" class="btn secondary" type="button">Админ-режим</button>
         </div>
       </section>
     </div>
   `;
 
   document.getElementById("start-btn").onclick = () => setScreen("username");
-  document.getElementById("open-admin-btn").onclick = () => {
-    window.location.pathname = "/admin";
-  };
 }
-
 function renderUsernameCheck() {
   app.innerHTML = `
     <div class="page-center">
