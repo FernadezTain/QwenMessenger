@@ -145,6 +145,7 @@ async function buildChatView(chat, currentUserId) {
 
   return {
     id: chat.id,
+    user_id: otherUser?.id || otherUserId,
     username: otherUser?.username || "@unknown",
     title: otherUser?.display_name || otherUser?.username || "@unknown",
     subtitle: otherUser?.bio || "Личный диалог",
@@ -443,6 +444,80 @@ app.post("/api/messenger/send-message", async (req, res) => {
     });
 
     res.json({ success: true, message });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete("/api/messenger/message", async (req, res) => {
+  try {
+    const chatId = String(req.body.chatId || "");
+    const messageId = String(req.body.messageId || "");
+    const userId = String(req.body.userId || "");
+
+    ensure(chatId && messageId && userId, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ РґР°РЅРЅС‹С…");
+
+    const chat = await requireChatAccess(chatId, userId);
+    ensure(chat, "Р§Р°С‚ РЅРµ РЅР°Р№РґРµРЅ", 404);
+
+    const rows = await sb(
+      `messenger_messages?id=eq.${encodeURIComponent(messageId)}&chat_id=eq.${encodeURIComponent(
+        chatId
+      )}&select=*`
+    );
+    const message = rows?.[0];
+
+    ensure(message, "РЎРѕРѕР±С‰РµРЅРёРµ РЅРµ РЅР°Р№РґРµРЅРѕ", 404);
+    ensure(message.sender_id === userId, "РњРѕР¶РЅРѕ СѓРґР°Р»СЏС‚СЊ С‚РѕР»СЊРєРѕ СЃРІРѕРё СЃРѕРѕР±С‰РµРЅРёСЏ", 403);
+
+    await sb(
+      `messenger_messages?id=eq.${encodeURIComponent(messageId)}&chat_id=eq.${encodeURIComponent(
+        chatId
+      )}`,
+      {
+        method: "DELETE",
+        headers: { Prefer: "return=minimal" },
+      }
+    );
+
+    const remaining = await sb(
+      `messenger_messages?chat_id=eq.${encodeURIComponent(chatId)}&select=created_at&order=created_at.desc&limit=1`
+    );
+    const latestCreatedAt = remaining?.[0]?.created_at || chat.created_at;
+
+    await sb(`messenger_chats?id=eq.${encodeURIComponent(chatId)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ updated_at: latestCreatedAt }),
+    });
+
+    res.json({ success: true, messageId });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete("/api/messenger/chat", async (req, res) => {
+  try {
+    const chatId = String(req.body.chatId || "");
+    const userId = String(req.body.userId || "");
+
+    ensure(chatId && userId, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ РґР°РЅРЅС‹С…");
+
+    const chat = await requireChatAccess(chatId, userId);
+    ensure(chat, "Р§Р°С‚ РЅРµ РЅР°Р№РґРµРЅ", 404);
+
+    await sb(`messenger_messages?chat_id=eq.${encodeURIComponent(chatId)}`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
+
+    await sb(`messenger_chats?id=eq.${encodeURIComponent(chatId)}`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
+
+    res.json({ success: true, chatId });
   } catch (error) {
     res.status(error.statusCode || 500).json({ success: false, error: error.message });
   }
