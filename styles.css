@@ -25,6 +25,7 @@
 
 html, body {
   margin: 0;
+  height: 100%;
   min-height: 100%;
 }
 
@@ -78,6 +79,12 @@ body {
   z-index: 1;
   min-height: 100vh;
   padding: 24px;
+}
+
+#app.app-messenger {
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
 }
 
 .page-center {
@@ -373,7 +380,8 @@ body {
   display: grid;
   grid-template-columns: 340px minmax(0, 1fr);
   gap: 18px;
-  min-height: calc(100vh - 48px);
+  height: calc(100dvh - 48px);
+  min-height: calc(100dvh - 48px);
   align-items: stretch;
 }
 
@@ -515,6 +523,7 @@ body {
   gap: 18px;
   min-width: 0;
   min-height: 0;
+  height: 100%;
 }
 
 .chat-panel {
@@ -522,11 +531,24 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
+#chat-view,
+.chat-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.chat-screen-empty {
+  justify-content: center;
+}
+
 .chat-empty {
-  min-height: calc(100vh - 140px);
+  flex: 1;
   display: grid;
   place-items: center;
   text-align: center;
@@ -561,6 +583,7 @@ body {
   flex-direction: column;
   gap: 12px;
   min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .message-row {
@@ -598,15 +621,19 @@ body {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
+  margin-top: auto;
   padding-top: 16px;
   border-top: 1px solid var(--line);
   align-items: end;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(7, 17, 31, 0), rgba(7, 17, 31, 0.94) 24%);
 }
 
 .profile-panel {
   padding: 18px;
   min-height: 0;
   overflow: auto;
+  height: 100%;
 }
 
 .profile-head {
@@ -721,13 +748,15 @@ body {
 
   .shell {
     grid-template-columns: 1fr;
-    min-height: calc(100vh - 24px);
+    height: calc(100dvh - 24px);
+    min-height: calc(100dvh - 24px);
   }
 
   .sidebar,
   .chat-panel,
   .profile-panel {
-    min-height: calc(100vh - 24px);
+    height: calc(100dvh - 24px);
+    min-height: calc(100dvh - 24px);
   }
 
   .shell.mobile-chat-mode .sidebar,
@@ -744,7 +773,7 @@ body {
   }
 
   .sidebar {
-    min-height: calc(100vh - 24px);
+    min-height: calc(100dvh - 24px);
   }
 
   .sidebar-head {
