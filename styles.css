@@ -564,6 +564,27 @@ body {
   flex-wrap: wrap;
 }
 
+.chat-profile-trigger {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.chat-profile-trigger:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 20px;
+}
+
+.chat-head-open {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .chat-title {
   font-size: 30px;
   margin: 0;
@@ -598,6 +619,10 @@ body {
   max-width: min(78%, 620px);
   padding: 14px 16px;
   border-radius: 18px;
+}
+
+.message-bubble.can-open-menu {
+  cursor: context-menu;
 }
 
 .message-row.own .message-bubble {
@@ -662,6 +687,11 @@ body {
   display: none;
 }
 
+.danger-ghost {
+  border-color: rgba(255, 118, 118, 0.3);
+  color: #ffbcbc;
+}
+
 .profile-stack {
   display: flex;
   flex-direction: column;
@@ -678,6 +708,116 @@ body {
   color: #07111f;
   font-family: "Space Grotesk", sans-serif;
   font-size: 32px;
+  font-weight: 700;
+}
+
+.contact-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.contact-hero {
+  padding: 20px;
+  border-radius: 28px;
+  border: 1px solid rgba(97, 215, 200, 0.16);
+  background:
+    radial-gradient(circle at top center, rgba(97, 215, 200, 0.3), transparent 52%),
+    linear-gradient(180deg, rgba(70, 163, 143, 0.95), rgba(46, 114, 105, 0.92));
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+.contact-hero-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.contact-avatar {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  margin: 0 auto;
+  background: linear-gradient(135deg, rgba(255, 203, 117, 0.98), rgba(121, 168, 255, 0.95));
+  color: #07111f;
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
+}
+
+.contact-avatar-lg {
+  width: 120px;
+  height: 120px;
+  font-size: 54px;
+}
+
+.contact-name {
+  margin: 18px 0 6px;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.05;
+}
+
+.contact-username {
+  color: rgba(238, 245, 255, 0.84);
+  font-size: 18px;
+}
+
+.contact-bio {
+  margin: 12px auto 0;
+  max-width: 440px;
+  color: rgba(238, 245, 255, 0.86);
+  line-height: 1.6;
+}
+
+.contact-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.contact-action {
+  min-height: 62px;
+  padding: 16px 18px;
+  border: 0;
+  border-radius: 22px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-action {
+  color: #04131b;
+  background: linear-gradient(135deg, var(--accent-3), var(--accent));
+}
+
+.danger-action {
+  color: #ffe5e5;
+  background: linear-gradient(135deg, rgba(255, 118, 118, 0.84), rgba(202, 61, 92, 0.95));
+}
+
+.contact-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.contact-info-card {
+  min-height: 126px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.contact-info-card.full {
+  grid-column: 1 / -1;
+  min-height: 0;
+}
+
+.contact-card-value {
+  margin-top: 10px;
+  font-size: 20px;
   font-weight: 700;
 }
 
@@ -716,6 +856,57 @@ body {
   z-index: 50;
 }
 
+#floating-root {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+}
+
+.message-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 8, 18, 0.35);
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+
+.message-menu {
+  position: absolute;
+  min-width: 210px;
+  padding: 10px;
+  border-radius: 22px;
+  border: 1px solid rgba(121, 168, 255, 0.2);
+  background: rgba(9, 20, 36, 0.96);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+}
+
+.message-menu-title {
+  padding: 8px 10px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.message-menu-btn {
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.message-menu-btn.danger {
+  color: #ffb0b0;
+  background: rgba(255, 118, 118, 0.12);
+}
+
 .toast {
   min-width: 240px;
   max-width: 320px;
@@ -730,6 +921,10 @@ body {
 .toast.success { border-color: rgba(102, 223, 151, 0.35); }
 .toast.error { border-color: rgba(255, 118, 118, 0.35); }
 .toast.info { border-color: rgba(121, 168, 255, 0.35); }
+
+.mobile-nav {
+  display: none;
+}
 
 @media (max-width: 1200px) {
   .shell {
@@ -808,6 +1003,39 @@ body {
     display: block;
   }
 
+  .mobile-nav {
+    position: fixed;
+    left: 50%;
+    bottom: 14px;
+    transform: translateX(-50%);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: min(92vw, 420px);
+    padding: 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(18, 18, 18, 0.92);
+    backdrop-filter: blur(18px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    z-index: 20;
+  }
+
+  .mobile-nav-btn {
+    min-height: 54px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.86);
+    font: inherit;
+    font-weight: 700;
+  }
+
+  .mobile-nav-btn.active,
+  .mobile-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
   .profile-head {
     align-items: flex-start;
     flex-direction: column;
@@ -863,6 +1091,16 @@ body {
 
   .chat-title {
     font-size: 24px;
+  }
+
+  .contact-actions,
+  .contact-card-grid,
+  .contact-hero-top {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-hero-top {
+    display: grid;
   }
 
   .message-bubble {
