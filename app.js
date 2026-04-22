@@ -9,9 +9,11 @@ const state = {
   authFlow: "",
   currentUser: null,
   profileOpen: false,
+  profileView: "self",
   chats: [],
   activeChatId: null,
   messages: {},
+  contextMenu: null,
   searchResults: [],
   adminSession: false,
   adminToken: "",
@@ -622,6 +624,8 @@ async function loadChats() {
 async function openChat(chatId) {
   state.activeChatId = chatId;
   state.profileOpen = false;
+  state.profileView = "self";
+  state.contextMenu = null;
   if (!state.messages[chatId]) {
     try {
       const data = await api(`/messenger/messages?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(state.currentUser.id)}`);
@@ -634,7 +638,79 @@ async function openChat(chatId) {
   renderMessenger();
 }
 
-function renderMessenger() {
+function openOwnProfile() {
+  state.profileView = "self";
+  state.profileOpen = true;
+  state.contextMenu = null;
+  renderMessenger();
+}
+
+function openChatProfile() {
+  if (!state.activeChatId) return;
+  state.profileView = "chat";
+  state.profileOpen = true;
+  state.contextMenu = null;
+  renderMessenger();
+}
+
+function closeContextMenu() {
+  if (!state.contextMenu) return;
+  state.contextMenu = null;
+  renderMessenger();
+}
+
+async function deleteMessageForEveryone(messageId) {
+  if (!state.activeChatId || !messageId) return;
+  try {
+    await api("/messenger/message", {
+      method: "DELETE",
+      body: JSON.stringify({
+        chatId: state.activeChatId,
+        messageId,
+        userId: state.currentUser.id,
+      }),
+    });
+
+    state.messages[state.activeChatId] = (state.messages[state.activeChatId] || []).filter(
+      (message) => String(message.id) !== String(messageId)
+    );
+    state.contextMenu = null;
+    await syncMessengerData();
+    renderMessenger();
+    setToast("Сообщение удалено у всех", "success");
+  } catch (error) {
+    setToast(error.message, "error");
+  }
+}
+
+async function deleteActiveChat() {
+  if (!state.activeChatId) return;
+  if (!window.confirm("Удалить чат полностью? Сообщения исчезнут у всех.")) return;
+
+  const chatId = state.activeChatId;
+  try {
+    await api("/messenger/chat", {
+      method: "DELETE",
+      body: JSON.stringify({
+        chatId,
+        userId: state.currentUser.id,
+      }),
+    });
+
+    state.chats = state.chats.filter((chat) => chat.id !== chatId);
+    delete state.messages[chatId];
+    state.activeChatId = null;
+    state.profileOpen = false;
+    state.profileView = "self";
+    state.contextMenu = null;
+    renderMessenger();
+    setToast("Чат удалён", "success");
+  } catch (error) {
+    setToast(error.message, "error");
+  }
+}
+
+renderMessenger = function renderMessenger() {
   app.classList.add("app-messenger");
   app.innerHTML = document.getElementById("shell-template").innerHTML;
   const shell = document.querySelector(".shell");
@@ -934,6 +1010,330 @@ async function onSaveProfile() {
     setToast(error.message, "error");
   }
 }
+
+function renderMessenger() {
+  app.classList.add("app-messenger");
+  app.innerHTML = document.getElementById("shell-template").innerHTML;
+  const shell = document.querySelector(".shell");
+  const onMobile = isMobileLayout();
+
+  if (shell) {
+    if (onMobile) {
+      if (state.profileOpen) {
+        shell.classList.add("mobile-profile-mode");
+      } else if (state.activeChatId) {
+        shell.classList.add("mobile-chat-mode");
+      } else {
+        shell.classList.add("mobile-list-mode");
+      }
+    } else {
+      shell.classList.add("desktop-mode");
+    }
+  }
+
+  const chatList = document.getElementById("chat-list");
+  chatList.innerHTML = state.chats.length
+    ? state.chats.map((chat) => `
+      <div class="chat-item ${state.activeChatId === chat.id ? "active" : ""}" data-chat-id="${chat.id}">
+        <div class="user-line">
+          <div class="username">${escapeHtml(chat.title || chat.username || "@user")}</div>
+          <div class="meta">${formatTime(chat.last_message_at)}</div>
+        </div>
+        <div class="meta">${escapeHtml(chat.last_message || "Открой чат")}</div>
+      </div>
+    `).join("")
+    : `
+      <div class="empty-card">
+        <div class="label">Пока нет чатов</div>
+        <div class="muted">Ищи людей по @username сверху и открывай переписку.</div>
+      </div>
+    `;
+
+  chatList.querySelectorAll(".chat-item").forEach((item) => {
+    item.onclick = () => openChat(item.dataset.chatId);
+  });
+
+  const activeChat = state.chats.find((chat) => chat.id === state.activeChatId);
+  const messages = state.messages[state.activeChatId] || [];
+  const chatView = document.getElementById("chat-view");
+
+  if (!activeChat) {
+    chatView.innerHTML = `
+      <div class="chat-screen chat-screen-empty">
+        <div class="chat-empty">
+          <div class="chat-empty-card">
+            <div class="eyebrow">Fernie Messenger</div>
+            <h2 class="section-title">Выбери <span>чат</span></h2>
+            <p class="section-text">Найди пользователя по @username и открой диалог.</p>
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    chatView.innerHTML = `
+      <div class="chat-screen">
+        <button id="open-chat-profile" class="chat-head chat-profile-trigger" type="button">
+          <div class="chat-head-main">
+            ${onMobile ? `<span id="mobile-back-to-list" class="ghost-btn mobile-back-btn">← Чаты</span>` : ""}
+            <h2 class="chat-title">${escapeHtml(activeChat.title || activeChat.username)}</h2>
+            <div class="chat-sub">${escapeHtml(activeChat.subtitle || "Личный диалог")}</div>
+          </div>
+          <div class="chat-head-actions">
+            <span class="badge">${escapeHtml(activeChat.username || state.username)}</span>
+            <span class="chat-head-open">Открыть профиль</span>
+          </div>
+        </button>
+
+        <div id="messages-box" class="chat-messages">
+          ${messages.length ? messages.map((message) => `
+            <div class="message-row ${message.sender_id === state.currentUser.id ? "own" : ""}">
+              <div class="message-bubble ${message.sender_id === state.currentUser.id ? "can-open-menu" : ""}" data-message-id="${message.id}" data-own="${message.sender_id === state.currentUser.id ? "1" : "0"}">
+                <div class="message-text">${escapeHtml(message.text)}</div>
+                <div class="message-time">${formatTime(message.created_at)}</div>
+              </div>
+            </div>
+          `).join("") : `
+            <div class="empty-card">
+              <div class="label">Пустой чат</div>
+              <div class="muted">Напиши первое сообщение.</div>
+            </div>
+          `}
+        </div>
+
+        <div class="composer">
+          <textarea id="message-input" class="textarea" placeholder="Напиши сообщение..." rows="2"></textarea>
+          <button id="send-message" class="btn" type="button">Отправить</button>
+        </div>
+      </div>
+    `;
+  }
+
+  renderProfilePanel(activeChat);
+  renderContextMenu();
+  bindShellEvents(activeChat);
+
+  const messagesBox = document.getElementById("messages-box");
+  if (messagesBox) {
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+  }
+};
+
+renderProfilePanel = function renderProfilePanel(activeChat) {
+  const panel = document.getElementById("profile-panel");
+  panel.classList.toggle("hidden", !state.profileOpen && isMobileLayout());
+
+  if (!state.profileOpen && isMobileLayout()) {
+    panel.innerHTML = "";
+    return;
+  }
+
+  if (state.profileView === "chat" && activeChat) {
+    panel.innerHTML = `
+      <div class="contact-profile">
+        <div class="contact-hero">
+          <div class="contact-hero-top">
+            <button id="back-from-contact" class="ghost-btn" type="button">${isMobileLayout() ? "← Назад" : "Вернуться в чат"}</button>
+            <button id="delete-chat-btn" class="ghost-btn danger-ghost" type="button">Удалить чат</button>
+          </div>
+          <div class="contact-avatar contact-avatar-lg">${escapeHtml(getInitial(activeChat.title || activeChat.username))}</div>
+          <h2 class="contact-name">${escapeHtml(activeChat.title || activeChat.username)}</h2>
+          <div class="contact-username">${escapeHtml(activeChat.username || "@user")}</div>
+          <p class="contact-bio">${escapeHtml(activeChat.subtitle || "Личный диалог")}</p>
+        </div>
+
+        <div class="contact-actions">
+          <button id="back-to-chat-btn" class="contact-action primary-action" type="button">Вернуться в чат</button>
+          <button id="delete-chat-card-btn" class="contact-action danger-action" type="button">Удалить чат</button>
+        </div>
+
+        <div class="contact-card-grid">
+          <div class="contact-info-card">
+            <div class="label">Имя пользователя</div>
+            <div class="contact-card-value">${escapeHtml(activeChat.username || "@user")}</div>
+          </div>
+          <div class="contact-info-card">
+            <div class="label">Диалог</div>
+            <div class="contact-card-value">Личный чат</div>
+          </div>
+          <div class="contact-info-card full">
+            <div class="label">О пользователе</div>
+            <div class="muted">${escapeHtml(activeChat.subtitle || "Без описания")}</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const closeContact = () => {
+      state.profileOpen = false;
+      state.profileView = "self";
+      renderMessenger();
+    };
+
+    document.getElementById("back-from-contact").onclick = closeContact;
+    document.getElementById("back-to-chat-btn").onclick = closeContact;
+    document.getElementById("delete-chat-btn").onclick = deleteActiveChat;
+    document.getElementById("delete-chat-card-btn").onclick = deleteActiveChat;
+    return;
+  }
+
+  const user = state.currentUser;
+  panel.innerHTML = `
+    <div class="profile-head">
+      <strong>Профиль</strong>
+      <div class="profile-head-actions">
+        ${isMobileLayout() ? `<button id="close-profile-btn" class="ghost-btn" type="button">← Назад</button>` : ""}
+        <button id="logout-btn" class="ghost-btn" type="button">Выйти</button>
+      </div>
+    </div>
+
+    <div class="profile-stack">
+      <div class="profile-card">
+        <div class="avatar">${escapeHtml(getInitial(user.display_name || user.username))}</div>
+        <h3>${escapeHtml(user.display_name || user.username)}</h3>
+        <div class="meta">${escapeHtml(user.username)}</div>
+        <p class="muted">${escapeHtml(user.bio || "Без описания")}</p>
+      </div>
+
+      <div class="profile-card">
+        <label class="label" for="profile-display">Ник</label>
+        <input id="profile-display" class="input" type="text" value="${escapeHtml(user.display_name || "")}">
+        <label class="label" for="profile-bio" style="margin-top:12px;">О себе</label>
+        <textarea id="profile-bio" class="textarea">${escapeHtml(user.bio || "")}</textarea>
+        <div class="profile-actions" style="margin-top:12px;">
+          <button id="save-profile" class="btn" type="button">Сохранить</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("logout-btn").onclick = () => {
+    stopMessengerPolling();
+    clearUserSession();
+    state.currentUser = null;
+    state.profileOpen = false;
+    state.profileView = "self";
+    state.contextMenu = null;
+    state.chats = [];
+    state.messages = {};
+    state.activeChatId = null;
+    state.password = "";
+    state.tempToken = "";
+    state.username = "";
+    setScreen("welcome");
+  };
+
+  if (isMobileLayout()) {
+    document.getElementById("close-profile-btn").onclick = () => {
+      state.profileOpen = false;
+      state.profileView = "self";
+      renderMessenger();
+    };
+  }
+
+  document.getElementById("save-profile").onclick = onSaveProfile;
+};
+
+function renderContextMenu() {
+  const root = document.getElementById("floating-root");
+  if (!root) return;
+
+  if (!state.contextMenu) {
+    root.innerHTML = "";
+    return;
+  }
+
+  root.innerHTML = `
+    <div id="message-menu-backdrop" class="message-menu-backdrop"></div>
+    <div class="message-menu" style="left:${state.contextMenu.x}px; top:${state.contextMenu.y}px;">
+      <div class="message-menu-title">Действия</div>
+      <button id="delete-message-for-all" class="message-menu-btn danger" type="button">Удалить у всех</button>
+    </div>
+  `;
+
+  document.getElementById("message-menu-backdrop").onclick = closeContextMenu;
+  document.getElementById("delete-message-for-all").onclick = () => deleteMessageForEveryone(state.contextMenu.messageId);
+}
+
+bindShellEvents = function bindShellEvents(activeChat) {
+  document.getElementById("open-profile").onclick = () => {
+    if (state.profileOpen && state.profileView === "self") {
+      state.profileOpen = false;
+    } else {
+      state.profileView = "self";
+      state.profileOpen = true;
+    }
+    renderMessenger();
+  };
+
+  const searchInput = document.getElementById("chat-search");
+  searchInput.addEventListener("input", onSearchUsers);
+
+  const mobileChatsBtn = document.getElementById("mobile-nav-chats");
+  const mobileSearchBtn = document.getElementById("mobile-nav-search");
+  const mobileProfileBtn = document.getElementById("mobile-nav-profile");
+
+  [mobileChatsBtn, mobileSearchBtn, mobileProfileBtn].forEach((button) => {
+    if (button) button.classList.remove("active");
+  });
+
+  if (mobileProfileBtn && state.profileOpen) {
+    mobileProfileBtn.classList.add("active");
+  } else if (mobileChatsBtn) {
+    mobileChatsBtn.classList.add("active");
+  }
+
+  if (mobileChatsBtn) {
+    mobileChatsBtn.onclick = () => {
+      state.profileOpen = false;
+      state.profileView = "self";
+      state.contextMenu = null;
+      state.activeChatId = null;
+      renderMessenger();
+    };
+  }
+
+  if (mobileSearchBtn) {
+    mobileSearchBtn.onclick = () => {
+      state.profileOpen = false;
+      state.profileView = "self";
+      renderMessenger();
+      setTimeout(() => document.getElementById("chat-search")?.focus(), 0);
+    };
+  }
+
+  if (mobileProfileBtn) {
+    mobileProfileBtn.onclick = openOwnProfile;
+  }
+
+  if (!activeChat) {
+    return;
+  }
+
+  document.getElementById("send-message").onclick = onSendMessage;
+  document.getElementById("open-chat-profile").onclick = openChatProfile;
+
+  if (isMobileLayout() && document.getElementById("mobile-back-to-list")) {
+    document.getElementById("mobile-back-to-list").onclick = (event) => {
+      event.stopPropagation();
+      state.activeChatId = null;
+      state.profileOpen = false;
+      state.profileView = "self";
+      renderMessenger();
+    };
+  }
+
+  document.querySelectorAll(".message-bubble[data-own='1']").forEach((bubble) => {
+    bubble.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      state.contextMenu = {
+        x: Math.min(event.clientX, window.innerWidth - 220),
+        y: Math.min(event.clientY, window.innerHeight - 120),
+        messageId: bubble.dataset.messageId,
+      };
+      renderMessenger();
+    });
+  });
+};
 
 function renderAdminMode() {
   if (!state.adminSession) {
