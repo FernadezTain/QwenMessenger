@@ -8,6 +8,7 @@ const state = {
   tempToken: "",
   authFlow: "",
   currentUser: null,
+  profileOpen: false,
   chats: [],
   activeChatId: null,
   messages: {},
@@ -20,6 +21,8 @@ const state = {
 };
 
 const app = document.getElementById("app");
+let messengerPollTimer = null;
+const SESSION_KEY = "qwen_messenger_session";
 
 const passwordLevels = [
   { min: 0, label: "Слишком слабый", score: 0 },
@@ -65,6 +68,120 @@ function formatDate(value) {
 function setScreen(screen) {
   state.screen = screen;
   render();
+}
+
+function saveUserSession() {
+  if (!state.currentUser) return;
+  localStorage.setItem(SESSION_KEY, JSON.stringify(state.currentUser));
+}
+
+function clearUserSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+function restoreUserSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return false;
+    const user = JSON.parse(raw);
+    if (!user?.id || !user?.username) return false;
+    state.currentUser = user;
+    return true;
+  } catch (_error) {
+    clearUserSession();
+    return false;
+  }
+}
+
+function isMobileLayout() {
+  return window.innerWidth <= 920;
+}
+
+function sortChatsByActivity(chats) {
+  return [...chats].sort((a, b) => {
+    const aTime = new Date(a.last_message_at || 0).getTime();
+    const bTime = new Date(b.last_message_at || 0).getTime();
+    return bTime - aTime;
+  });
+}
+
+function areMessageListsEqual(a = [], b = []) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (
+      a[i].id !== b[i].id ||
+      a[i].text !== b[i].text ||
+      a[i].created_at !== b[i].created_at ||
+      a[i].sender_id !== b[i].sender_id
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function areChatListsEqual(a = [], b = []) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (
+      a[i].id !== b[i].id ||
+      a[i].title !== b[i].title ||
+      a[i].last_message !== b[i].last_message ||
+      a[i].last_message_at !== b[i].last_message_at
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function stopMessengerPolling() {
+  if (messengerPollTimer) {
+    clearInterval(messengerPollTimer);
+    messengerPollTimer = null;
+  }
+}
+
+function startMessengerPolling() {
+  stopMessengerPolling();
+  if (!state.currentUser) return;
+  messengerPollTimer = setInterval(async () => {
+    await syncMessengerData();
+  }, 2500);
+}
+
+async function syncMessengerData() {
+  if (!state.currentUser) return;
+  try {
+    const chatsData = await api(`/messenger/chats?userId=${encodeURIComponent(state.currentUser.id)}`);
+    const nextChats = sortChatsByActivity(chatsData.chats || []);
+    let shouldRender = !areChatListsEqual(state.chats, nextChats);
+    state.chats = nextChats;
+
+    if (state.activeChatId) {
+      const messageData = await api(
+        `/messenger/messages?chatId=${encodeURIComponent(state.activeChatId)}&userId=${encodeURIComponent(state.currentUser.id)}`
+      );
+      const nextMessages = messageData.messages || [];
+      if (!areMessageListsEqual(state.messages[state.activeChatId] || [], nextMessages)) {
+        state.messages[state.activeChatId] = nextMessages;
+        shouldRender = true;
+      }
+    } else if (state.chats[0]) {
+      state.activeChatId = state.chats[0].id;
+      const firstMessages = await api(
+        `/messenger/messages?chatId=${encodeURIComponent(state.activeChatId)}&userId=${encodeURIComponent(state.currentUser.id)}`
+      );
+      state.messages[state.activeChatId] = firstMessages.messages || [];
+      shouldRender = true;
+    }
+
+    if (shouldRender) {
+      renderMessenger();
+    }
+  } catch (_error) {
+    // Ignore background polling errors.
+  }
 }
 
 function setToast(text, type = "info") {
@@ -480,7 +597,9 @@ async function onVerifyTotp() {
       bio: "Новый пользователь Qwen Messenger",
     };
 
+    saveUserSession();
     await loadChats();
+    startMessengerPolling();
     setToast("Вход выполнен", "success");
     render();
   } catch (error) {
@@ -492,7 +611,7 @@ async function onVerifyTotp() {
 async function loadChats() {
   try {
     const data = await api(`/messenger/chats?userId=${encodeURIComponent(state.currentUser.id)}`);
-    state.chats = data.chats || [];
+    state.chats = sortChatsByActivity(data.chats || []);
     if (!state.activeChatId && state.chats[0]) {
       state.activeChatId = state.chats[0].id;
       await openChat(state.activeChatId);
@@ -505,6 +624,7 @@ async function loadChats() {
 
 async function openChat(chatId) {
   state.activeChatId = chatId;
+  state.profileOpen = false;
   if (!state.messages[chatId]) {
     try {
       const data = await api(`/messenger/messages?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(state.currentUser.id)}`);
@@ -519,6 +639,16 @@ async function openChat(chatId) {
 
 function renderMessenger() {
   app.innerHTML = document.getElementById("shell-template").innerHTML;
+  const shell = document.querySelector(".shell");
+  const onMobile = isMobileLayout();
+
+  if (shell && onMobile) {
+    if (state.profileOpen) {
+      shell.classList.add("mobile-profile-mode");
+    } else if (state.activeChatId) {
+      shell.classList.add("mobile-chat-mode");
+    }
+  }
 
   const chatList = document.getElementById("chat-list");
   if (!state.chats.length) {
@@ -563,11 +693,15 @@ function renderMessenger() {
   } else {
     chatView.innerHTML = `
       <div class="chat-head">
-        <div>
+        <div class="chat-head-main">
+          ${onMobile ? `<button id="mobile-back-to-list" class="ghost-btn mobile-back-btn" type="button">← Чаты</button>` : ""}
           <h2 class="chat-title">${escapeHtml(activeChat.title || activeChat.username)}</h2>
           <div class="chat-sub">${escapeHtml(activeChat.subtitle || "Личный диалог")}</div>
         </div>
-        <span class="badge">${escapeHtml(activeChat.username || state.username)}</span>
+        <div class="chat-head-actions">
+          <span class="badge">${escapeHtml(activeChat.username || state.username)}</span>
+          ${onMobile ? `<button id="mobile-open-profile" class="ghost-btn" type="button">Профиль</button>` : ""}
+        </div>
       </div>
 
       <div id="messages-box" class="chat-messages">
@@ -593,15 +727,31 @@ function renderMessenger() {
     `;
 
     document.getElementById("send-message").onclick = onSendMessage;
+    if (onMobile) {
+      document.getElementById("mobile-back-to-list").onclick = () => {
+        state.activeChatId = null;
+        state.profileOpen = false;
+        renderMessenger();
+      };
+      document.getElementById("mobile-open-profile").onclick = () => {
+        state.profileOpen = true;
+        renderMessenger();
+      };
+    }
   }
 
   renderProfilePanel();
   bindShellEvents();
+
+  const messagesBox = document.getElementById("messages-box");
+  if (messagesBox) {
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+  }
 }
 
 function renderProfilePanel() {
   const panel = document.getElementById("profile-panel");
-  panel.classList.remove("hidden");
+  panel.classList.toggle("hidden", !state.profileOpen && isMobileLayout());
   const user = state.currentUser;
   panel.innerHTML = `
     <div class="profile-head">
@@ -630,7 +780,10 @@ function renderProfilePanel() {
   `;
 
   document.getElementById("logout-btn").onclick = () => {
+    stopMessengerPolling();
+    clearUserSession();
     state.currentUser = null;
+    state.profileOpen = false;
     state.chats = [];
     state.messages = {};
     state.activeChatId = null;
@@ -754,6 +907,7 @@ async function onSaveProfile() {
     });
 
     state.currentUser = { ...state.currentUser, ...(data.user || { display_name: displayName, bio }) };
+    saveUserSession();
     setToast("Профиль сохранён", "success");
     renderMessenger();
   } catch (error) {
@@ -917,4 +1071,18 @@ function renderAdminDashboard() {
   });
 }
 
-render();
+if (restoreUserSession()) {
+  loadChats()
+    .then(() => {
+      startMessengerPolling();
+      render();
+    })
+    .catch(() => {
+      stopMessengerPolling();
+      clearUserSession();
+      state.currentUser = null;
+      render();
+    });
+} else {
+  render();
+}
