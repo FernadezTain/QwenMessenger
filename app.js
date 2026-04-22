@@ -225,6 +225,8 @@ function getPasswordStrength(password) {
 }
 
 function render() {
+  app.classList.remove("app-messenger");
+
   if (state.mode === "admin") {
     renderAdminMode();
     return;
@@ -633,6 +635,7 @@ async function openChat(chatId) {
 }
 
 function renderMessenger() {
+  app.classList.add("app-messenger");
   app.innerHTML = document.getElementById("shell-template").innerHTML;
   const shell = document.querySelector(".shell");
   const onMobile = isMobileLayout();
@@ -658,6 +661,8 @@ function renderMessenger() {
         <div class="label">Пока нет чатов</div>
         <div class="muted">Ищи людей по @username сверху и открывай переписку.</div>
       </div>
+      </div>
+      </div>
     `;
   } else {
     chatList.innerHTML = state.chats.map((chat) => `
@@ -681,7 +686,8 @@ function renderMessenger() {
 
   if (!activeChat) {
     chatView.innerHTML = `
-      <div class="chat-empty">
+      <div class="chat-screen chat-screen-empty">
+        <div class="chat-empty">
         <div class="chat-empty-card">
           <div class="eyebrow">Fernie Messenger</div>
           <h2 class="section-title">Выбери <span>чат</span></h2>
@@ -689,11 +695,13 @@ function renderMessenger() {
             Найди пользователя по @username, открой диалог и обменивайся текстовыми сообщениями как в Telegram.
           </p>
         </div>
+        </div>
       </div>
     `;
   } else {
     chatView.innerHTML = `
-      <div class="chat-head">
+      <div class="chat-screen">
+        <div class="chat-head">
         <div class="chat-head-main">
           ${onMobile ? `<button id="mobile-back-to-list" class="ghost-btn mobile-back-btn" type="button">← Чаты</button>` : ""}
           <h2 class="chat-title">${escapeHtml(activeChat.title || activeChat.username)}</h2>
@@ -703,9 +711,9 @@ function renderMessenger() {
           <span class="badge">${escapeHtml(activeChat.username || state.username)}</span>
           ${onMobile ? `<button id="mobile-open-profile" class="ghost-btn" type="button">Профиль</button>` : ""}
         </div>
-      </div>
+        </div>
 
-      <div id="messages-box" class="chat-messages">
+        <div id="messages-box" class="chat-messages">
         ${messages.length ? messages.map((message) => `
           <div class="message-row ${message.sender_id === state.currentUser.id ? "own" : ""}">
             <div class="message-bubble">
@@ -724,6 +732,7 @@ function renderMessenger() {
       <div class="composer">
         <textarea id="message-input" class="textarea" placeholder="Напиши сообщение..." rows="2"></textarea>
         <button id="send-message" class="btn" type="button">Отправить</button>
+      </div>
       </div>
     `;
 
