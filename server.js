@@ -21,10 +21,6 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUP
 const ADMIN_TOKEN_SECRET = process.env.ADMIN_TOKEN_SECRET || "change-me";
 const INDEX_FILE = fileURLToPath(new URL("./index.html", import.meta.url));
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.warn("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in environment.");
-}
-
 const sbHeaders = {
   apikey: SUPABASE_SERVICE_KEY,
   Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
@@ -86,6 +82,18 @@ function verifyAdminToken(token) {
 }
 
 async function sb(path, options = {}) {
+  if (!SUPABASE_URL) {
+    const error = new Error("Не задан SUPABASE_URL в .env");
+    error.statusCode = 500;
+    throw error;
+  }
+
+  if (!SUPABASE_SERVICE_KEY) {
+    const error = new Error("Не задан SUPABASE_SERVICE_KEY в .env");
+    error.statusCode = 500;
+    throw error;
+  }
+
   const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...options,
     headers: {
