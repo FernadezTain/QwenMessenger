@@ -775,19 +775,18 @@ renderMessenger = function renderMessenger() {
       </div>
     `;
   } else {
-    chatView.innerHTML = `
-      <div class="chat-screen">
-        <div class="chat-head">
-        <div class="chat-head-main">
-          ${onMobile ? `<button id="mobile-back-to-list" class="ghost-btn mobile-back-btn" type="button">← Чаты</button>` : ""}
-          <h2 class="chat-title">${escapeHtml(activeChat.title || activeChat.username)}</h2>
-          <div class="chat-sub">${escapeHtml(activeChat.subtitle || "Личный диалог")}</div>
-        </div>
-        <div class="chat-head-actions">
-          <span class="badge">${escapeHtml(activeChat.username || state.username)}</span>
-          ${onMobile ? `<button id="mobile-open-profile" class="ghost-btn" type="button">Профиль</button>` : ""}
-        </div>
-        </div>
+chatView.innerHTML = `
+  <div class="chat-screen">
+    <div class="chat-head">
+    <div class="chat-head-main">
+      ${onMobile ? `<button id="mobile-back-to-list" class="ghost-btn mobile-back-btn" type="button">← Чаты</button>` : ""}
+      <h2 class="chat-title">${escapeHtml(activeChat.title || activeChat.username)}</h2>
+      <div class="chat-sub">${escapeHtml(activeChat.subtitle || "Личный диалог")}</div>
+    </div>
+    <div class="chat-head-actions">
+      <span class="badge">${escapeHtml(activeChat.username || state.username)}</span>
+    </div>
+    </div>
 
         <div id="messages-box" class="chat-messages">
         ${messages.length ? messages.map((message) => `
