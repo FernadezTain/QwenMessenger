@@ -22,7 +22,7 @@ const state = {
 
 const app = document.getElementById("app");
 let messengerPollTimer = null;
-const SESSION_KEY = "qwen_messenger_session";
+const SESSION_KEY = "Fernie_messenger_session";
 
 const passwordLevels = [
   { min: 0, label: "Слишком слабый", score: 0 },
@@ -167,7 +167,7 @@ async function syncMessengerData() {
         state.messages[state.activeChatId] = nextMessages;
         shouldRender = true;
       }
-    } else if (state.chats[0]) {
+    } else if (state.chats[0] && !isMobileLayout()) {
       state.activeChatId = state.chats[0].id;
       const firstMessages = await api(
         `/messenger/messages?chatId=${encodeURIComponent(state.activeChatId)}&userId=${encodeURIComponent(state.currentUser.id)}`
@@ -269,8 +269,8 @@ function renderWelcome() {
   app.innerHTML = `
     <div class="page-center">
       <section class="hero-card">
-        <div class="eyebrow">Qwen Secure Chat</div>
-        <h1 class="hero-title">Qwen, <span>Приветствуем!</span></h1>
+        <div class="eyebrow">Fernie Secure Chat</div>
+        <h1 class="hero-title">Fernie, <span>Приветствуем!</span></h1>
         <p class="hero-text">
           Современный вход в мессенджер с системой <strong>@username</strong>, обязательной сильной защитой
           и подключением Google Authenticator перед первым входом.
@@ -293,7 +293,7 @@ function renderUsernameCheck() {
   app.innerHTML = `
     <div class="page-center">
       <section class="auth-card">
-        <div class="section-subtitle">Qwen | Аутентификация</div>
+        <div class="section-subtitle">Fernie | Аутентификация</div>
         <h2 class="section-title">Введите <span>@username</span></h2>
         <p class="section-text">
           Проверка происходит без учёта регистра. Например, <strong>@Banan123</strong> и <strong>@BaNaN123</strong>
@@ -367,7 +367,7 @@ function renderRegister() {
   app.innerHTML = `
     <div class="page-center">
       <section class="auth-card">
-        <div class="section-subtitle">Qwen | Регистрация</div>
+        <div class="section-subtitle">Fernie | Регистрация</div>
         <h2 class="section-title"><span>${escapeHtml(state.username)}</span> свободен!</h2>
         <p class="section-text">Придумай пароль. Продолжить можно только когда сила пароля станет <strong>Отличный</strong>.</p>
 
@@ -448,7 +448,7 @@ function renderLogin() {
   app.innerHTML = `
     <div class="page-center">
       <section class="auth-card">
-        <div class="section-subtitle">Qwen | Вход в аккаунт</div>
+        <div class="section-subtitle">Fernie | Вход в аккаунт</div>
         <h2 class="section-title"><span>${escapeHtml(state.username)}</span> уже зарегистрирован!</h2>
         <p class="section-text">Введите пароль для входа. Проверка идёт на твоём сервере.</p>
 
@@ -506,13 +506,13 @@ function renderTotpSetup() {
   app.innerHTML = `
     <div class="page-center">
       <section class="auth-card">
-        <div class="section-subtitle">Qwen | Google Authentificator</div>
+        <div class="section-subtitle">Fernie | Google Authentificator</div>
         <h2 class="section-title">Подключи <span>2FA</span></h2>
         <p class="section-text">Отсканируй QR в Google Authenticator или введи код вручную.</p>
 
         <div class="panel">
           <div class="qr-box">
-            <img class="qr-image" src="${escapeHtml(state.qrCode || "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=Qwen%20Authenticator")}" alt="QR code">
+            <img class="qr-image" src="${escapeHtml(state.qrCode || "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=Fernie%20Authenticator")}" alt="QR code">
             <div>
               <div class="mini-card">
                 <div class="label">Ручной код</div>
@@ -543,7 +543,7 @@ function renderTotpVerify() {
   app.innerHTML = `
     <div class="page-center">
       <section class="auth-card">
-        <div class="section-subtitle">Qwen | Google Authentificator код</div>
+        <div class="section-subtitle">Fernie | Google Authentificator код</div>
         <h2 class="section-title">Введите <span>6-значный код</span></h2>
         <p class="section-text">Если код верный, ты попадёшь в аккаунт и откроется главная страница мессенджера.</p>
 
@@ -594,7 +594,7 @@ async function onVerifyTotp() {
       id: data.userId,
       username: state.username,
       display_name: state.username.replace("@", ""),
-      bio: "Новый пользователь Qwen Messenger",
+      bio: "Новый пользователь Fernie Messenger",
     };
 
     saveUserSession();
@@ -612,7 +612,7 @@ async function loadChats() {
   try {
     const data = await api(`/messenger/chats?userId=${encodeURIComponent(state.currentUser.id)}`);
     state.chats = sortChatsByActivity(data.chats || []);
-    if (!state.activeChatId && state.chats[0]) {
+    if (!state.activeChatId && state.chats[0] && !isMobileLayout()) {
       state.activeChatId = state.chats[0].id;
       await openChat(state.activeChatId);
     }
@@ -642,11 +642,17 @@ function renderMessenger() {
   const shell = document.querySelector(".shell");
   const onMobile = isMobileLayout();
 
-  if (shell && onMobile) {
-    if (state.profileOpen) {
-      shell.classList.add("mobile-profile-mode");
-    } else if (state.activeChatId) {
-      shell.classList.add("mobile-chat-mode");
+  if (shell) {
+    if (onMobile) {
+      if (state.profileOpen) {
+        shell.classList.add("mobile-profile-mode");
+      } else if (state.activeChatId) {
+        shell.classList.add("mobile-chat-mode");
+      } else {
+        shell.classList.add("mobile-list-mode");
+      }
+    } else {
+      shell.classList.add("desktop-mode");
     }
   }
 
@@ -682,7 +688,7 @@ function renderMessenger() {
     chatView.innerHTML = `
       <div class="chat-empty">
         <div class="chat-empty-card">
-          <div class="eyebrow">Qwen Messenger</div>
+          <div class="eyebrow">Fernie Messenger</div>
           <h2 class="section-title">Выбери <span>чат</span></h2>
           <p class="section-text">
             Найди пользователя по @username, открой диалог и обменивайся текстовыми сообщениями как в Telegram.
@@ -756,7 +762,10 @@ function renderProfilePanel() {
   panel.innerHTML = `
     <div class="profile-head">
       <strong>Профиль</strong>
-      <button id="logout-btn" class="ghost-btn" type="button">Выйти</button>
+      <div class="profile-head-actions">
+        ${isMobileLayout() ? `<button id="close-profile-btn" class="ghost-btn" type="button">← Назад</button>` : ""}
+        <button id="logout-btn" class="ghost-btn" type="button">Выйти</button>
+      </div>
     </div>
 
     <div class="profile-stack">
@@ -792,12 +801,19 @@ function renderProfilePanel() {
     state.username = "";
     setScreen("welcome");
   };
+  if (isMobileLayout()) {
+    document.getElementById("close-profile-btn").onclick = () => {
+      state.profileOpen = false;
+      renderMessenger();
+    };
+  }
   document.getElementById("save-profile").onclick = onSaveProfile;
 }
 
 function bindShellEvents() {
   document.getElementById("open-profile").onclick = () => {
-    document.getElementById("profile-panel").classList.toggle("hidden");
+    state.profileOpen = !state.profileOpen;
+    renderMessenger();
   };
 
   const searchInput = document.getElementById("chat-search");
@@ -928,7 +944,7 @@ function renderAdminLogin() {
   app.innerHTML = `
     <div class="page-center">
       <section class="admin-card">
-        <div class="section-subtitle">Qwen | Admin</div>
+        <div class="section-subtitle">Fernie | Admin</div>
         <h1 class="admin-title"><span>Админ-панель</span></h1>
         <p class="section-text">
           Введи пароль администратора. Он должен храниться на сервере в Supabase в хэшированном виде,
@@ -999,7 +1015,7 @@ function renderAdminDashboard() {
       <section class="admin-card" style="width:min(100%, 1040px);">
         <div class="admin-head">
           <div>
-            <div class="section-subtitle">Qwen | Admin Dashboard</div>
+            <div class="section-subtitle">Fernie | Admin Dashboard</div>
             <h1 class="admin-title">Раздел <span>модерации</span></h1>
           </div>
           <button id="admin-logout" class="btn secondary" type="button">Выйти</button>
